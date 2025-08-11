@@ -1,0 +1,32 @@
+{
+  "name": "sky",
+  "version": "1.0.0",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node --experimental-specifier-resolution=node --loader ts-node/esm ./src/server.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "5.0.3",
+    "@types/node": "24.1.0",
+    "ts-node": "10.9.2"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.859.0",
+    "@aws-sdk/lib-storage": "3.859.0",
+    "@types/express-fileupload": "^1.5.1",
+    "@types/uniqid": "5.3.4",
+    "convert-multiple-files": "1.2.5",
+    "cors": "2.8.5",
+    "dotenv": "17.2.1",
+    "express": "5.1.0",
+    "express-fileupload": "1.5.2",
+    "pdf-merger-js": "5.1.2",
+    "uniqid": "5.4.0"
+  }
+}
