@@ -1,20 +1,19 @@
-import express, { Request } from "express";
-import fileUpload, { UploadedFile } from "express-fileupload";
-import { promises as fs } from "fs";
-import * as path from "path";
-import cors from "cors";
-import { convertWordFiles } from "convert-multiple-files";
-import { s3Upload } from "./s3/upload";
-import { s3Download } from "./s3/download";
-import { addNewCase, setNewFile } from "./dbEvents";
-import uniqid from "uniqid";
-import PDFMerger from "pdf-merger-js";
-import Together from "together-ai";
-import dotenv from "dotenv";
+import express, { Request } from 'express';
+import fileUpload, { UploadedFile } from 'express-fileupload';
+import { access, writeFile, readFile, unlink } from 'node:fs/promises';
+import path from 'path';
+import cors from 'cors';
+import { convertWordFiles } from 'convert-multiple-files';
+import { s3Upload } from './s3/upload';
+import { s3Download } from './s3/download';
+import { addNewCase, setNewFile } from './dbEvents';
+import uniqid from 'uniqid';
+import PDFMerger from 'pdf-merger-js';
+import dotenv from 'dotenv';
 
-import { caseFile, newCase, uploadCase, UploadedFileCase } from "./types";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
-import { s3 } from "./s3/YStorageUploadFile";
+import { caseFile, newCase, uploadCase, UploadedFileCase } from './types';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { s3 } from './s3/YStorageUploadFile';
 
 const app = express();
 dotenv.config();
@@ -23,33 +22,32 @@ app.use(express.json());
 app.use(cors());
 app.use(fileUpload());
 
-app.get("/ping", (req, res) => {
-  res.send("pong");
+app.get('/ping', (req, res) => {
+  res.send('pong');
 });
 
 app.put(
-  "/case/new",
+  '/case/new',
   async (req: Request<unknown, unknown, uploadCase, unknown>, res) => {
     const uploadCaseData = req.body;
     const caseName = uploadCaseData.name;
     const newId = uniqid(caseName);
-    const dateCreated: string = new Date().toLocaleString("ru");
+    const dateCreated: string = new Date().toLocaleString('ru');
 
     const caseParams: newCase = {
       id: newId,
       ...uploadCaseData,
-      created: dateCreated
+      created: dateCreated,
     };
 
-    await fs
-      .access("./db/cases.json")
+    await access('./db/cases.json')
       .then(async () => {
         await addNewCase(caseParams);
 
         res.end();
       })
       .catch(async () => {
-        await fs.writeFile("./db/cases.json", "[]");
+        await writeFile('./db/cases.json', '[]');
         await addNewCase(caseParams);
 
         res.end();
@@ -57,8 +55,8 @@ app.put(
   }
 );
 
-app.get("/case/list", async (req, res) => {
-  const caseList = await fs.readFile("./db/cases.json", { encoding: "utf-8" });
+app.get('/case/list', async (req, res) => {
+  const caseList = await readFile('./db/cases.json', 'utf-8');
   const caseListToJson: JSON = JSON.parse(caseList);
 
   res.json(caseListToJson);
@@ -66,26 +64,25 @@ app.get("/case/list", async (req, res) => {
   res.end();
 });
 
-app.get("/file/get", async (req, res) => {
+app.get('/file/get', async (req, res) => {
   const caseId = req.query.id;
 
   if (!caseId) {
-    throw new Error("Cases not found");
+    throw new Error('Cases not found');
   }
 
-  const files = await fs.readFile("./db/casesFiles.json", {
-    encoding: "utf-8",
+  const files = await readFile('./db/casesFiles.json', {
+    encoding: 'utf-8',
   });
 
   const filesList: Array<caseFile> = JSON.parse(files);
 
-  const filesCase = filesList.filter((file) => file.caseId === String(caseId))
-  .map(file => (
-    {
-      id: file.id, 
-      name: file.files.docx
-    }
-  ));
+  const filesCase = filesList
+    .filter((file) => file.caseId === String(caseId))
+    .map((file) => ({
+      id: file.id,
+      name: file.files.docx,
+    }));
 
   res.json(filesCase);
 
@@ -93,29 +90,29 @@ app.get("/file/get", async (req, res) => {
 });
 
 app.post(
-  "/file/upload",
+  '/file/upload',
   async (req: Request<unknown, unknown, UploadedFileCase>, res) => {
     const uploadFile = req.files;
     const caseId = req.body.id;
 
     if (!uploadFile || Object.keys(uploadFile).length === 0) {
-      return res.status(400).send("No files were uploaded.");
+      return res.status(400).send('No files were uploaded.');
     }
 
     if (!caseId) {
-      throw new Error("Case not found");
+      throw new Error('Case not found');
     }
 
     console.log(req.body.id);
 
     const sampleFile = uploadFile.file as UploadedFile;
-    const [fileName, fileExtension] = sampleFile.name.split(".");
+    const [fileName, fileExtension] = sampleFile.name.split('.');
 
     if (Array.isArray(sampleFile)) {
-      throw new Error("Error: Upload single file");
+      throw new Error('Error: Upload single file');
     }
 
-    const uploadPath = "./" + sampleFile.name;
+    const uploadPath = './' + sampleFile.name;
 
     const fileToBinary = new Uint8Array(sampleFile.data);
     const file = new File([fileToBinary], sampleFile.name, {
@@ -129,16 +126,16 @@ app.post(
 
       const pdfFileLink = await convertWordFiles(
         path.resolve(uploadPath),
-        "pdf",
-        path.resolve("./")
+        'pdf',
+        path.resolve('./')
       );
 
-      const pdfFileBinary = await fs.readFile(pdfFileLink);
+      const pdfFileBinary = await readFile(pdfFileLink);
       const pdfFile = new File(
         [new Uint8Array(pdfFileBinary)],
         `${fileName}.pdf`,
         {
-          type: "application/pdf",
+          type: 'application/pdf',
         }
       );
 
@@ -151,23 +148,22 @@ app.post(
         },
       };
 
-      await fs
-        .access("./db/casesFiles.json")
+      await access('./db/casesFiles.json')
         .then(async () => {
           await setNewFile(setNewFileParams);
         })
         .catch(async () => {
-          await fs.writeFile("./db/casesFiles.json", "[]");
+          await writeFile('./db/casesFiles.json', '[]');
           await setNewFile(setNewFileParams);
         });
 
       await s3Upload(file);
       await s3Upload(pdfFile);
 
-      await fs.unlink(uploadPath);
-      await fs.unlink(pdfFileLink);
+      await unlink(uploadPath);
+      await unlink(pdfFileLink);
 
-      res.send("File uploaded!");
+      res.send('File uploaded!');
 
       res.end();
     });
@@ -175,12 +171,12 @@ app.post(
 );
 
 app.get(
-  "/file/download",
+  '/file/download',
   async (req: Request<unknown, unknown, string>, res) => {
     const fileName: string = String(req.query.fileName);
 
     if (!fileName) {
-      throw new Error("file not found");
+      throw new Error('file not found');
     }
 
     res.json({ link: s3Download(fileName) });
@@ -189,15 +185,15 @@ app.get(
   }
 );
 
-app.get("/file/merge", async (req, res) => {
+app.get('/file/merge', async (req, res) => {
   const caseId = req.query.id;
 
   if (!caseId) {
-    throw new Error("Files not found");
+    throw new Error('Files not found');
   }
 
-  const files = await fs.readFile("./db/casesFiles.json", {
-    encoding: "utf-8",
+  const files = await readFile('./db/casesFiles.json', {
+    encoding: 'utf-8',
   });
 
   const filesList: Array<caseFile> = JSON.parse(files);
@@ -209,7 +205,7 @@ app.get("/file/merge", async (req, res) => {
     const pdfFileName = files.files.pdf;
 
     const command = new GetObjectCommand({
-      Bucket: "test-cases",
+      Bucket: 'test-cases',
       Key: pdfFileName,
     });
 
@@ -227,7 +223,7 @@ app.get("/file/merge", async (req, res) => {
     await merger.add(fileBuffer);
   }
 
-  await merger.save("merged.pdf");
+  await merger.save('merged.pdf');
 
   res.end();
 });
