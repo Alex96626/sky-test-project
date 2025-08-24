@@ -1,30 +1,33 @@
 import { UploadedFile } from "express-fileupload";
 
-export type uploadCase = {
-  name: string,
-  created: string;
-  dateCreated: string;
-  fileSize: number;
-}
-
-export type newCase = {
+export type CaseData = {
   id: string,
   name: string,
   created: string;
-  dateCreated: string;
-  fileSize: number;
 };
+
+export type CaseList = CaseData[];
+
+export type UploadCase = Omit<CaseData, 'id' | 'created'>;
+
 
 export type fileExtension = {
   docx: string,
   pdf: string
 }
 
-export type caseFile = {
+export type CaseFile = {
   id: string;
   caseId: string
   files: fileExtension;
 };
+
+export type ReturnedFile = {
+  id: string,
+  name: string
+};
+
+export type ReturnedFileList = ReturnedFile[];
 
 export type UploadedFileCase = { 
   id: string; 
