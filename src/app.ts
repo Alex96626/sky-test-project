@@ -7,14 +7,17 @@ import { convertWordFiles } from "convert-multiple-files";
 import { s3Upload } from "./s3/upload";
 import { s3Download } from "./s3/download";
 import { addNewCase, setNewFile } from "./dbEvents";
-import uniqid from 'uniqid';
-import PDFMerger from 'pdf-merger-js';
+import uniqid from "uniqid";
+import PDFMerger from "pdf-merger-js";
+import Together from "together-ai";
+import dotenv from "dotenv";
 
-import { caseFile, newCase, uploadCase } from "./types";
+import { caseFile, newCase, uploadCase, UploadedFileCase } from "./types";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
-import { s3 } from './s3/YStorageUploadFile';
+import { s3 } from "./s3/YStorageUploadFile";
 
 const app = express();
+dotenv.config();
 
 app.use(express.json());
 app.use(cors());
@@ -24,30 +27,35 @@ app.get("/ping", (req, res) => {
   res.send("pong");
 });
 
-app.put("/case/new", async (req: Request<unknown, unknown, uploadCase,unknown>, res) => {
-  const uploadCaseData = req.body; 
-  const caseName = uploadCaseData.name;
-  const newId = uniqid(caseName);
+app.put(
+  "/case/new",
+  async (req: Request<unknown, unknown, uploadCase, unknown>, res) => {
+    const uploadCaseData = req.body;
+    const caseName = uploadCaseData.name;
+    const newId = uniqid(caseName);
+    const dateCreated: string = new Date().toLocaleString("ru");
 
-  const caseParams: newCase = {
-    id: newId,
-    ...uploadCaseData 
-  };
-  
-  await fs
-    .access("./db/cases.json")
-    .then(async () => {
-      await addNewCase(caseParams);
+    const caseParams: newCase = {
+      id: newId,
+      ...uploadCaseData,
+      created: dateCreated
+    };
 
-      res.end();
-    })
-    .catch(async () => {
-      await fs.writeFile("./db/cases.json", "[]");
-      await addNewCase(caseParams);
+    await fs
+      .access("./db/cases.json")
+      .then(async () => {
+        await addNewCase(caseParams);
 
-      res.end();
-    });
-});
+        res.end();
+      })
+      .catch(async () => {
+        await fs.writeFile("./db/cases.json", "[]");
+        await addNewCase(caseParams);
+
+        res.end();
+      });
+  }
+);
 
 app.get("/case/list", async (req, res) => {
   const caseList = await fs.readFile("./db/cases.json", { encoding: "utf-8" });
@@ -68,20 +76,25 @@ app.get("/file/get", async (req, res) => {
   const files = await fs.readFile("./db/casesFiles.json", {
     encoding: "utf-8",
   });
-    
+
   const filesList: Array<caseFile> = JSON.parse(files);
 
-  const filesCase = filesList.find((file) => file.id === String(caseId));
+  const filesCase = filesList.filter((file) => file.caseId === String(caseId))
+  .map(file => (
+    {
+      id: file.id, 
+      name: file.files.docx
+    }
+  ));
 
-  const filesIdList = filesCase?.files;
-
-  res.json(filesIdList);
+  res.json(filesCase);
 
   res.end();
 });
 
-app.post("/file/upload",
-  async (req: Request<unknown, unknown, { id: string; file: UploadedFile }>, res) => {
+app.post(
+  "/file/upload",
+  async (req: Request<unknown, unknown, UploadedFileCase>, res) => {
     const uploadFile = req.files;
     const caseId = req.body.id;
 
@@ -90,7 +103,7 @@ app.post("/file/upload",
     }
 
     if (!caseId) {
-      throw new Error('Case not found');
+      throw new Error("Case not found");
     }
 
     console.log(req.body.id);
@@ -121,29 +134,32 @@ app.post("/file/upload",
       );
 
       const pdfFileBinary = await fs.readFile(pdfFileLink);
-      const pdfFile = new File([new Uint8Array(pdfFileBinary)], `${fileName}.pdf`, {
-        type: "application/pdf",
-      });
+      const pdfFile = new File(
+        [new Uint8Array(pdfFileBinary)],
+        `${fileName}.pdf`,
+        {
+          type: "application/pdf",
+        }
+      );
 
       const setNewFileParams: caseFile = {
-        "id": sampleFile.md5,
-        "caseId": caseId,
-        "files": {
-            "docx": `${fileName}.docs`,
-            "pdf": `${fileName}.pdf`
-        }
-      }
+        id: sampleFile.md5,
+        caseId: caseId,
+        files: {
+          docx: `${fileName}.docs`,
+          pdf: `${fileName}.pdf`,
+        },
+      };
 
       await fs
-        .access('./db/casesFiles.json')
-        .then( async () => {
+        .access("./db/casesFiles.json")
+        .then(async () => {
           await setNewFile(setNewFileParams);
         })
-        .catch( async () => {
+        .catch(async () => {
           await fs.writeFile("./db/casesFiles.json", "[]");
           await setNewFile(setNewFileParams);
-        })
-      
+        });
 
       await s3Upload(file);
       await s3Upload(pdfFile);
@@ -158,59 +174,62 @@ app.post("/file/upload",
   }
 );
 
-app.get('/file/download', async (req: Request<unknown, unknown, string>, res) => {
-  const fileName: string = String(req.query.fileName);
+app.get(
+  "/file/download",
+  async (req: Request<unknown, unknown, string>, res) => {
+    const fileName: string = String(req.query.fileName);
 
-  if (!fileName) {
-    throw new Error('file not found');
+    if (!fileName) {
+      throw new Error("file not found");
+    }
+
+    res.json({ link: s3Download(fileName) });
+
+    res.end();
   }
+);
 
-  res.json({'link': s3Download(fileName)})
-
-  res.end();
-})
-
-app.get('/file/merge', async (req, res) => {
+app.get("/file/merge", async (req, res) => {
   const caseId = req.query.id;
 
   if (!caseId) {
-    throw new Error('Files not found');
+    throw new Error("Files not found");
   }
 
   const files = await fs.readFile("./db/casesFiles.json", {
     encoding: "utf-8",
   });
-    
+
   const filesList: Array<caseFile> = JSON.parse(files);
-  const filesCases = filesList.filter(file => file.caseId === caseId)
+  const filesCases = filesList.filter((file) => file.caseId === caseId);
 
   const merger = new PDFMerger();
 
   for (const files of filesCases) {
     const pdfFileName = files.files.pdf;
 
-    const command = new GetObjectCommand( {
-      Bucket: 'test-cases',
+    const command = new GetObjectCommand({
+      Bucket: "test-cases",
       Key: pdfFileName,
-    })
+    });
 
     const response = await s3.send(command);
     const body = response.Body as AsyncIterable<Buffer>;
 
-    const chunks:any = [];
+    const chunks = [];
 
     for await (const chunk of body) {
       chunks.push(chunk);
     }
-   
+
     const fileBuffer = Buffer.concat(chunks);
 
     await merger.add(fileBuffer);
   }
 
-  await merger.save('merged.pdf');
+  await merger.save("merged.pdf");
 
   res.end();
-})
+});
 
 export { app };

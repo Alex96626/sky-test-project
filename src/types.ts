@@ -1,7 +1,9 @@
+import { UploadedFile } from "express-fileupload";
+
 export type uploadCase = {
   name: string,
   created: string;
-  dateCreated: Date;
+  dateCreated: string;
   fileSize: number;
 }
 
@@ -9,7 +11,7 @@ export type newCase = {
   id: string,
   name: string,
   created: string;
-  dateCreated: Date;
+  dateCreated: string;
   fileSize: number;
 };
 
@@ -23,3 +25,8 @@ export type caseFile = {
   caseId: string
   files: fileExtension;
 };
+
+export type UploadedFileCase = { 
+  id: string; 
+  file: UploadedFile 
+}
