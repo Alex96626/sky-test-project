@@ -1,8 +1,8 @@
 import express, { Request } from 'express';
 import { getCaseFileList } from '../../models/file/list';
 import { UploadedFileCase } from '../../types';
-import { upload } from '../../models/file/upload';
-import { merge } from '../../models/file/merge';
+import { uploadCaseFile } from '../../models/file/upload';
+import { mergeFiles } from '../../models/file/merge';
 import { download } from '../../models/file/download';
 
 export const fileRoute = express.Router();
@@ -11,7 +11,13 @@ fileRoute.get('/file/list:id', async (req: Request<{id: string}, unknown, unknow
     const caseId = req.params.id;
 
     if (!caseId) {
-        throw new Error('Cases not found');
+        res.status(400);
+
+        res.json({
+            message: 'Param "id" must be not empty'
+        })
+
+        res.end();
     }
 
     const filesCase = await getCaseFileList(caseId);
@@ -22,21 +28,33 @@ fileRoute.get('/file/list:id', async (req: Request<{id: string}, unknown, unknow
 });
 
 fileRoute.post(
-    '/file/upload',
-    async (req: Request<unknown, unknown, UploadedFileCase>, res) => {
+    '/file/upload: id',
+    async (req: Request<{id: string}, unknown, UploadedFileCase>, res) => {
         const uploadFile = req.body.file;
 
-        const caseId = req.body.id;
+        const caseId = req.params.id;
 
         if (!uploadFile || Object.keys(uploadFile).length === 0) {
-            return res.status(400).send('No files were uploaded.');
+            res.status(400)
+            
+            res.json({
+                message: 'No files were uploaded.'
+            });
+
+            res.end();
         }
 
         if (!caseId) {
-            throw new Error('Case not found');
+            res.status(400);
+
+            res.json({
+                message: 'Param "id" must be mot empty'
+            })
+
+            res.end();
         }
 
-        await upload(caseId, uploadFile);
+        await uploadCaseFile(caseId, uploadFile);
     }
 );
 
@@ -44,10 +62,16 @@ fileRoute.get('/file/merge:id', async (req: Request<{id: string}, unknown, unkno
     const caseId = req.params.id;
 
     if (!caseId) {
-        throw new Error('Files not found');
+        res.status(400);
+        
+        res.json({
+            message: 'Param "id" must be not empty'
+        })
+
+        res.end();
     }
 
-    const mergeFile = await merge(caseId);
+    const mergeFile = await mergeFiles(caseId);
 
     res.json(mergeFile);
 
@@ -60,7 +84,12 @@ fileRoute.get(
         const fileName: string = String(req.query.fileName);
 
         if (!fileName) {
-            throw new Error('file not found');
+            res.status(400);
+            res.json( {
+                message: 'file not found'
+            })
+
+            res.end();
         }
 
         const downloadLink = download(fileName);
