@@ -6,12 +6,8 @@ import { s3Upload } from '../../s3/upload';
 import { CASE_DB_FILES } from '../../config/const';
 import { UploadedFile } from 'express-fileupload';
 
-export const upload = async (caseId: string, sampleFile: UploadedFile) => {
+export const uploadCaseFile = async (caseId: string, sampleFile: UploadedFile) => {
     const pathToFileList = path.join(process.cwd(), CASE_DB_FILES);
-
-    if (Array.isArray(sampleFile)) {
-        throw new Error('Error: Upload single file');
-    }
 
     const [fileName] = sampleFile.name.split('.');
 

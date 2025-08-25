@@ -6,7 +6,7 @@ import { s3 } from "../../s3/YStorageUploadFile";
 import { CaseFile } from "../../types";
 import { CASE_DB_FILES } from "../../config/const";
 
-export const merge = async (id: string): Promise<Buffer> => {
+export const mergeFiles = async (id: string): Promise<Buffer> => {
     const pathToFileList = path.join(process.cwd(), CASE_DB_FILES);
     
     const files = await readFile(pathToFileList, 'utf-8');
