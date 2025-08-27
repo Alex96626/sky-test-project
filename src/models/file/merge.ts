@@ -25,15 +25,13 @@ export const mergeFiles = async (id: string): Promise<Buffer> => {
         });
 
         const response = await s3.send(command);
-        const body = response.Body as AsyncIterable<Buffer>;
+        const body = await response.Body?.transformToByteArray();
 
-        const chunks = [];
-
-        for await (const chunk of body) {
-            chunks.push(chunk);
+        if (!body) {
+            continue;
         }
 
-        const fileBuffer = Buffer.concat(chunks);
+        const fileBuffer = Buffer.from(body);
 
         await merger.add(fileBuffer);
     }
