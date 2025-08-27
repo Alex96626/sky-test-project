@@ -21,7 +21,7 @@ export const mergeFiles = async (id: string): Promise<Buffer> => {
 
         const command = new GetObjectCommand({
             Bucket: 'test-cases',
-            Key: pdfFileName,
+            Key: pdfFileName?.fileName,
         });
 
         const response = await s3.send(command);

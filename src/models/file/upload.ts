@@ -5,6 +5,7 @@ import { convertWordFiles } from 'convert-multiple-files';
 import { s3Upload } from '../../s3/upload';
 import { CASE_DB_FILES } from '../../config/const';
 import { UploadedFile } from 'express-fileupload';
+import { Md5 } from '@smithy/md5-js';
 
 export const uploadCaseFile = async (caseId: string, sampleFile: UploadedFile) => {
     const pathToFileList = path.join(process.cwd(), CASE_DB_FILES);
@@ -12,11 +13,6 @@ export const uploadCaseFile = async (caseId: string, sampleFile: UploadedFile) =
     const [fileName] = sampleFile.name.split('.');
 
     const uploadPath = './' + sampleFile.name;
-
-    const fileToBinary = new Uint8Array(sampleFile.data);
-    const file = new File([fileToBinary], sampleFile.name, {
-        type: sampleFile.mimetype,
-    });
 
     sampleFile.mv(uploadPath, async function (error) {
         if (error) {
@@ -29,22 +25,20 @@ export const uploadCaseFile = async (caseId: string, sampleFile: UploadedFile) =
             path.resolve('./')
         );
 
-        const pdfFileBinary = await readFile(pdfFileLink);
-
-        const pdfFile = new File(
-            [new Uint8Array(pdfFileBinary)],
-            `${fileName}.pdf`,
-            {
-                type: 'application/pdf',
-            }
-        );
+        const pdfMd5Hash = new Md5();
 
         const setNewFileData: CaseFile = {
             id: sampleFile.md5,
             caseId: caseId,
             files: {
-                docx: `${fileName}.docs`,
-                pdf: `${fileName}.pdf`,
+                docx: {
+                    fileName: `${fileName}.docs`,
+                    md5: sampleFile.md5,
+                },
+                pdf: {
+                    fileName: `${fileName}.pdf`,
+                    md5: String(pdfMd5Hash)
+                },
             },
         };
 
@@ -62,8 +56,8 @@ export const uploadCaseFile = async (caseId: string, sampleFile: UploadedFile) =
 
         await writeFile(pathToFileList, JSON.stringify(currentFileData));
 
-        await s3Upload(file);
-        await s3Upload(pdfFile);
+        await s3Upload(sampleFile.md5, uploadPath);
+        await s3Upload(pdfMd5Hash, pdfFileLink);
 
         await unlink(uploadPath);
         await unlink(pdfFileLink);

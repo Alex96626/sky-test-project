@@ -1,18 +1,13 @@
 import { Upload } from '@aws-sdk/lib-storage';
 import { s3 } from './YStorageUploadFile';
-import { CompleteMultipartUploadCommandOutput } from '@aws-sdk/client-s3';
+import { CompleteMultipartUploadCommandOutput, PutObjectCommandInput } from '@aws-sdk/client-s3';
+import { Md5 } from '@smithy/md5-js';
 
-type uploadType = {
-    Bucket: string,
-    Key: string,
-    Body: File,
-}
-
-export const s3Upload = async (body:File): Promise<CompleteMultipartUploadCommandOutput> => {
-    const params: uploadType = {
+export const s3Upload = async (md5Hash: Md5 | string, filePath: string): Promise<CompleteMultipartUploadCommandOutput> => {
+    const params: PutObjectCommandInput = {
         Bucket: 'test-cases',
-        Key: body.name,
-        Body: body,
+        Key: String(md5Hash),
+        Body: filePath,
     };
 
     const upload = new Upload({

@@ -10,10 +10,14 @@ export type CaseList = CaseData[];
 
 export type UploadCase = Omit<CaseData, 'id' | 'created'>;
 
+type fileData = {
+  fileName: string,
+  md5: string
+}
 
 export type fileExtension = {
-  docx: string,
-  pdf: string
+  docx: fileData,
+  pdf?: fileData
 }
 
 export type CaseFile = {
