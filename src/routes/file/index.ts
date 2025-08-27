@@ -54,6 +54,16 @@ fileRoute.post(
             res.end();
         }
 
+        if  (Array.isArray(uploadFile)) {
+            res.status(400);
+
+            res.json({
+                message: 'Upload only single file'
+            })
+
+            res.end();
+        }
+
         await uploadCaseFile(caseId, uploadFile);
     }
 );
